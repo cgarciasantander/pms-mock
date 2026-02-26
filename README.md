@@ -10,7 +10,7 @@ A monolithic **Property Management System** for hotels built with FastAPI, follo
 | ORM | SQLAlchemy 2.x (async) |
 | Database | PostgreSQL 16 via asyncpg |
 | Migrations | Alembic |
-| Auth | OAuth2 Password Flow · JWT (access + refresh) |
+| Auth | OAuth2 Password Flow · Client Credentials · JWT (access + refresh) |
 | Config | pydantic-settings |
 | Testing | pytest + pytest-asyncio + factory-boy |
 | Linting | ruff + mypy |
@@ -49,6 +49,16 @@ erDiagram
         VARCHAR     token_hash  UK
         TIMESTAMPTZ expires_at
         BOOLEAN     revoked
+        TIMESTAMPTZ created_at
+        TIMESTAMPTZ updated_at
+    }
+
+    oauth_clients {
+        UUID        id                 PK
+        VARCHAR     client_id          UK
+        VARCHAR     client_secret_hash
+        VARCHAR     name
+        BOOLEAN     is_active
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
     }
@@ -99,7 +109,6 @@ erDiagram
         VARCHAR     confirmation_no UK
         UUID        guest_id        FK
         UUID        room_id         FK
-        UUID        created_by_id   FK
         DATE        check_in_date
         DATE        check_out_date
         INTEGER     adults
@@ -130,7 +139,6 @@ erDiagram
         NUMERIC     quantity
         NUMERIC     unit_price
         NUMERIC     total
-        TIMESTAMPTZ posted_at
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
     }
@@ -138,19 +146,15 @@ erDiagram
     payments {
         UUID        id           PK
         UUID        folio_id     FK
-        UUID        posted_by_id FK
         ENUM        method
         NUMERIC     amount
         VARCHAR     reference_no
         TEXT        notes
-        TIMESTAMPTZ posted_at
         TIMESTAMPTZ created_at
         TIMESTAMPTZ updated_at
     }
 
     users           ||--o{ refresh_tokens : "has (cascade delete)"
-    users           ||--o{ reservations   : "created_by"
-    users           ||--o{ payments       : "posted_by"
     guests          ||--o{ reservations   : "books"
     room_types      ||--o{ rooms          : "classifies"
     rooms           ||--o{ reservations   : "assigned to"
@@ -161,7 +165,8 @@ erDiagram
 
 ## Domain Modules
 
-- **Auth** — password flow, JWT access + refresh token rotation
+- **Auth** — password flow, JWT access + refresh token rotation, client credentials grant for M2M
+- **OAuth Clients** — registered API clients with `client_id`/`client_secret`, admin-managed
 - **Users** — hotel staff with roles (admin, manager, front_desk, housekeeping)
 - **Guests** — guest profiles, ID documents, preferences, stay history
 - **Rooms** — room types with rates, individual rooms with status machine
@@ -196,29 +201,51 @@ make install
 make migrate
 ```
 
-### 6. Start the API
+### 6. (Optional) Seed development data
+```bash
+make seed
+```
+
+### 7. Start the API
 ```bash
 make dev
 ```
 
 API docs: http://localhost:8000/docs
 
-## Auth Flow
+## Auth Flows
 
-### Obtain tokens
+### Password grant (human users)
 ```bash
 curl -X POST http://localhost:8000/auth/token \
-  -d "username=admin@hotel.com&password=secret" \
-  -H "Content-Type: application/x-www-form-urlencoded"
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=password&username=admin@hotel.com&password=admin123"
 ```
 
-### Use token
+### Client credentials grant (machine-to-machine)
 ```bash
-curl http://localhost:8000/api/v1/users/me \
+# 1. Register a client (admin token required)
+curl -X POST http://localhost:8000/auth/clients \
+  -H "Authorization: Bearer <admin_token>" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "My Service"}'
+# → returns client_id and client_secret (shown once)
+
+# 2. Exchange credentials for an access token
+curl -X POST http://localhost:8000/auth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=client_credentials&client_id=<id>&client_secret=<secret>"
+```
+
+Client tokens carry no refresh token and bypass role checks — they have full API access.
+
+### Use a token
+```bash
+curl http://localhost:8000/api/v1/rooms/ \
   -H "Authorization: Bearer <access_token>"
 ```
 
-### Refresh tokens
+### Refresh tokens (password grant only)
 ```bash
 curl -X POST http://localhost:8000/auth/refresh \
   -H "Content-Type: application/json" \
@@ -230,6 +257,8 @@ curl -X POST http://localhost:8000/auth/refresh \
 ```bash
 make test
 ```
+
+Integration tests require a running PostgreSQL instance (`pms_test` database). Each test runs inside a rolled-back transaction — no cleanup needed.
 
 Coverage report is generated in `htmlcov/`.
 
