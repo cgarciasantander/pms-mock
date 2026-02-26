@@ -6,7 +6,7 @@ Usage:
 """
 import asyncio
 import random
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, timedelta
 from decimal import Decimal
 
 from faker import Faker
@@ -16,10 +16,10 @@ from app.auth.password import hash_password
 from app.controllers import billing_controller, reservation_controller
 from app.controllers import oauth_controller
 from app.database.session import AsyncSessionLocal
-from app.models.billing import Folio, LineItemType, PaymentMethod, Payment
+from app.models.billing import Folio, LineItemType, PaymentMethod
 from app.models.guest import Guest, IdDocumentType
-from app.models.reservation import Reservation, ReservationStatus
-from app.models.room import Room, RoomCategory, RoomStatus, RoomType
+from app.models.reservation import Reservation
+from app.models.room import Room, RoomCategory, RoomType
 from app.models.user import User, UserRole
 from app.schemas.billing import LineItemCreate, PaymentCreate
 from app.schemas.oauth_client import OAuthClientCreate
@@ -85,7 +85,6 @@ ROOM_TYPES = [
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _fake_guest_payload() -> dict:
-    profile = fake.simple_profile()
     return {
         "first_name": fake.first_name(),
         "last_name": fake.last_name(),
