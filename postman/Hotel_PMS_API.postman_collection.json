@@ -1,0 +1,780 @@
+{
+  "info": {
+    "name": "Hotel PMS API",
+    "description": "Property Management System — all endpoints with auto-token handling and chained variables.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "base_url",        "value": "http://localhost:8000" },
+    { "key": "access_token",    "value": "" },
+    { "key": "refresh_token",   "value": "" },
+    { "key": "user_id",         "value": "" },
+    { "key": "guest_id",        "value": "" },
+    { "key": "room_type_id",    "value": "" },
+    { "key": "room_id",         "value": "" },
+    { "key": "reservation_id",  "value": "" },
+    { "key": "folio_id",        "value": "" },
+    { "key": "line_item_id",    "value": "" },
+    { "key": "oauth_client_id", "value": "" },
+    { "key": "client_id",       "value": "" },
+    { "key": "client_secret",   "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login (password grant)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('access_token',  json.access_token);",
+                  "pm.collectionVariables.set('refresh_token', json.refresh_token ?? '');",
+                  "pm.test('Login successful', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type", "value": "password" },
+                { "key": "username",   "value": "admin@hotel.com" },
+                { "key": "password",   "value": "changeme" }
+              ]
+            },
+            "url": { "raw": "{{base_url}}/auth/token", "host": ["{{base_url}}"], "path": ["auth", "token"] }
+          }
+        },
+        {
+          "name": "Client Credentials Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('access_token', json.access_token);",
+                  "pm.test('Client token issued', () => pm.response.to.have.status(200));",
+                  "pm.test('No refresh token', () => pm.expect(json.refresh_token).to.be.null);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "grant_type",    "value": "client_credentials" },
+                { "key": "client_id",     "value": "{{client_id}}" },
+                { "key": "client_secret", "value": "{{client_secret}}" }
+              ]
+            },
+            "url": { "raw": "{{base_url}}/auth/token", "host": ["{{base_url}}"], "path": ["auth", "token"] }
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('access_token',  json.access_token);",
+                  "pm.collectionVariables.set('refresh_token', json.refresh_token ?? '');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/auth/refresh", "host": ["{{base_url}}"], "path": ["auth", "refresh"] }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/auth/logout", "host": ["{{base_url}}"], "path": ["auth", "logout"] }
+          }
+        },
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/auth/me", "host": ["{{base_url}}"], "path": ["auth", "me"] }
+          }
+        },
+        {
+          "name": "OAuth Clients",
+          "item": [
+            {
+              "name": "Create Client",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "const json = pm.response.json();",
+                      "if (json.id)          pm.collectionVariables.set('oauth_client_id', json.id);",
+                      "if (json.client_id)   pm.collectionVariables.set('client_id',       json.client_id);",
+                      "if (json.client_secret) pm.collectionVariables.set('client_secret', json.client_secret);",
+                      "pm.test('Client created', () => pm.response.to.have.status(201));",
+                      "pm.test('Secret returned once', () => pm.expect(json.client_secret).to.be.a('string'));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"My Integration Service\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": { "raw": "{{base_url}}/auth/clients", "host": ["{{base_url}}"], "path": ["auth", "clients"] }
+              }
+            },
+            {
+              "name": "List Clients",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/auth/clients?skip=0&limit=20",
+                  "host": ["{{base_url}}"],
+                  "path": ["auth", "clients"],
+                  "query": [
+                    { "key": "skip",  "value": "0" },
+                    { "key": "limit", "value": "20" }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Client",
+              "request": {
+                "method": "GET",
+                "url": { "raw": "{{base_url}}/auth/clients/{{oauth_client_id}}", "host": ["{{base_url}}"], "path": ["auth", "clients", "{{oauth_client_id}}"] }
+              }
+            },
+            {
+              "name": "Rotate Secret",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "const json = pm.response.json();",
+                      "if (json.client_id)     pm.collectionVariables.set('client_id',     json.client_id);",
+                      "if (json.client_secret) pm.collectionVariables.set('client_secret', json.client_secret);",
+                      "pm.test('Secret rotated', () => pm.response.to.have.status(200));"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "url": { "raw": "{{base_url}}/auth/clients/{{oauth_client_id}}/rotate-secret", "host": ["{{base_url}}"], "path": ["auth", "clients", "{{oauth_client_id}}", "rotate-secret"] }
+              }
+            },
+            {
+              "name": "Delete Client",
+              "request": {
+                "method": "DELETE",
+                "url": { "raw": "{{base_url}}/auth/clients/{{oauth_client_id}}", "host": ["{{base_url}}"], "path": ["auth", "clients", "{{oauth_client_id}}"] }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Create User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) pm.collectionVariables.set('user_id', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"staff@hotel.com\",\n  \"password\": \"changeme\",\n  \"full_name\": \"Jane Staff\",\n  \"role\": \"front_desk\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/users/", "host": ["{{base_url}}"], "path": ["api", "v1", "users", ""] }
+          }
+        },
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/?skip=0&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", ""],
+              "query": [
+                { "key": "skip",  "value": "0" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get User",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/users/{{user_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "users", "{{user_id}}"] }
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"full_name\": \"Jane Updated\",\n  \"email\": \"jane.updated@hotel.com\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/users/{{user_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "users", "{{user_id}}"] }
+          }
+        },
+        {
+          "name": "Update Role",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"manager\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/users/{{user_id}}/role", "host": ["{{base_url}}"], "path": ["api", "v1", "users", "{{user_id}}", "role"] }
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"old_password\": \"changeme\",\n  \"new_password\": \"newpassword123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/users/{{user_id}}/change-password", "host": ["{{base_url}}"], "path": ["api", "v1", "users", "{{user_id}}", "change-password"] }
+          }
+        },
+        {
+          "name": "Deactivate User",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/api/v1/users/{{user_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "users", "{{user_id}}"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Guests",
+      "item": [
+        {
+          "name": "Create Guest",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) pm.collectionVariables.set('guest_id', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"first_name\": \"John\",\n  \"last_name\": \"Doe\",\n  \"email\": \"john.doe@example.com\",\n  \"phone\": \"+1-555-0100\",\n  \"date_of_birth\": \"1985-06-15\",\n  \"nationality\": \"US\",\n  \"address\": \"123 Main St, Springfield, IL\",\n  \"doc_type\": \"passport\",\n  \"doc_number\": \"A12345678\",\n  \"preferences\": \"High floor, non-smoking\",\n  \"notes\": \"VIP guest\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/guests/", "host": ["{{base_url}}"], "path": ["api", "v1", "guests", ""] }
+          }
+        },
+        {
+          "name": "List Guests",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/guests/?q=&skip=0&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "guests", ""],
+              "query": [
+                { "key": "q",     "value": "",   "description": "Search by name or email" },
+                { "key": "skip",  "value": "0" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Guest",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/guests/{{guest_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "guests", "{{guest_id}}"] }
+          }
+        },
+        {
+          "name": "Update Guest",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+1-555-0199\",\n  \"preferences\": \"Ground floor, extra pillows\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/guests/{{guest_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "guests", "{{guest_id}}"] }
+          }
+        },
+        {
+          "name": "Delete Guest",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{base_url}}/api/v1/guests/{{guest_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "guests", "{{guest_id}}"] }
+          }
+        },
+        {
+          "name": "Stay History",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/guests/{{guest_id}}/stay-history", "host": ["{{base_url}}"], "path": ["api", "v1", "guests", "{{guest_id}}", "stay-history"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rooms",
+      "item": [
+        {
+          "name": "Room Types",
+          "item": [
+            {
+              "name": "Create Room Type",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "const json = pm.response.json();",
+                      "if (json.id) pm.collectionVariables.set('room_type_id', json.id);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Deluxe King\",\n  \"category\": \"double\",\n  \"description\": \"Spacious room with king bed and city view\",\n  \"base_rate\": \"199.00\",\n  \"max_occupancy\": 2,\n  \"amenities\": \"[\\\"wifi\\\",\\\"minibar\\\",\\\"safe\\\"]\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": { "raw": "{{base_url}}/api/v1/rooms/types", "host": ["{{base_url}}"], "path": ["api", "v1", "rooms", "types"] }
+              }
+            },
+            {
+              "name": "List Room Types",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/v1/rooms/types?skip=0&limit=50",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "rooms", "types"],
+                  "query": [
+                    { "key": "skip",  "value": "0" },
+                    { "key": "limit", "value": "50" }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Room Type",
+              "request": {
+                "method": "GET",
+                "url": { "raw": "{{base_url}}/api/v1/rooms/types/{{room_type_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "rooms", "types", "{{room_type_id}}"] }
+              }
+            },
+            {
+              "name": "Update Room Type",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"base_rate\": \"219.00\",\n  \"description\": \"Updated description\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": { "raw": "{{base_url}}/api/v1/rooms/types/{{room_type_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "rooms", "types", "{{room_type_id}}"] }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rooms",
+          "item": [
+            {
+              "name": "Create Room",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "const json = pm.response.json();",
+                      "if (json.id) pm.collectionVariables.set('room_id', json.id);"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"room_number\": \"101\",\n  \"floor\": 1,\n  \"room_type_id\": \"{{room_type_id}}\",\n  \"is_smoking\": false,\n  \"notes\": null\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": { "raw": "{{base_url}}/api/v1/rooms/", "host": ["{{base_url}}"], "path": ["api", "v1", "rooms", ""] }
+              }
+            },
+            {
+              "name": "List Rooms",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/v1/rooms/?skip=0&limit=50",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "rooms", ""],
+                  "query": [
+                    { "key": "status", "value": null,  "description": "available | occupied | housekeeping | maintenance | out_of_order", "disabled": true },
+                    { "key": "floor",  "value": null,  "disabled": true },
+                    { "key": "skip",   "value": "0" },
+                    { "key": "limit",  "value": "50" }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Available Rooms",
+              "request": {
+                "method": "GET",
+                "url": {
+                  "raw": "{{base_url}}/api/v1/rooms/available?check_in_date=2026-03-01&check_out_date=2026-03-05",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "rooms", "available"],
+                  "query": [
+                    { "key": "check_in_date",  "value": "2026-03-01" },
+                    { "key": "check_out_date", "value": "2026-03-05" },
+                    { "key": "room_type_id",   "value": "{{room_type_id}}", "disabled": true }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get Room",
+              "request": {
+                "method": "GET",
+                "url": { "raw": "{{base_url}}/api/v1/rooms/{{room_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "rooms", "{{room_id}}"] }
+              }
+            },
+            {
+              "name": "Update Room",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"floor\": 2,\n  \"is_smoking\": false,\n  \"notes\": \"Recently refurbished\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": { "raw": "{{base_url}}/api/v1/rooms/{{room_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "rooms", "{{room_id}}"] }
+              }
+            },
+            {
+              "name": "Update Room Status",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"housekeeping\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": { "raw": "{{base_url}}/api/v1/rooms/{{room_id}}/status", "host": ["{{base_url}}"], "path": ["api", "v1", "rooms", "{{room_id}}", "status"] }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Reservations",
+      "item": [
+        {
+          "name": "Create Reservation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) pm.collectionVariables.set('reservation_id', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"guest_id\": \"{{guest_id}}\",\n  \"room_id\": \"{{room_id}}\",\n  \"check_in_date\": \"2026-03-01\",\n  \"check_out_date\": \"2026-03-05\",\n  \"adults\": 2,\n  \"children\": 0,\n  \"special_requests\": \"Late check-in, please\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/reservations/", "host": ["{{base_url}}"], "path": ["api", "v1", "reservations", ""] }
+          }
+        },
+        {
+          "name": "List Reservations",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/reservations/?skip=0&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "reservations", ""],
+              "query": [
+                { "key": "guest_id", "value": "{{guest_id}}", "disabled": true },
+                { "key": "room_id",  "value": "{{room_id}}",  "disabled": true },
+                { "key": "status",   "value": null, "description": "confirmed | checked_in | checked_out | cancelled | no_show", "disabled": true },
+                { "key": "skip",     "value": "0" },
+                { "key": "limit",    "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Reservation",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/reservations/{{reservation_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "reservations", "{{reservation_id}}"] }
+          }
+        },
+        {
+          "name": "Update Reservation",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"check_out_date\": \"2026-03-06\",\n  \"special_requests\": \"Extra towels\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/reservations/{{reservation_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "reservations", "{{reservation_id}}"] }
+          }
+        },
+        {
+          "name": "Cancel Reservation",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/v1/reservations/{{reservation_id}}/cancel?reason=Guest+request",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "reservations", "{{reservation_id}}", "cancel"],
+              "query": [{ "key": "reason", "value": "Guest request" }]
+            }
+          }
+        },
+        {
+          "name": "Check In",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"early_check_in\": false\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/reservations/{{reservation_id}}/check-in", "host": ["{{base_url}}"], "path": ["api", "v1", "reservations", "{{reservation_id}}", "check-in"] }
+          }
+        },
+        {
+          "name": "Check Out",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.folio_id) pm.collectionVariables.set('folio_id', json.folio_id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/reservations/{{reservation_id}}/check-out", "host": ["{{base_url}}"], "path": ["api", "v1", "reservations", "{{reservation_id}}", "check-out"] }
+          }
+        },
+        {
+          "name": "Mark No-Show",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/reservations/{{reservation_id}}/no-show", "host": ["{{base_url}}"], "path": ["api", "v1", "reservations", "{{reservation_id}}", "no-show"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Billing",
+      "item": [
+        {
+          "name": "Get Folio",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/billing/{{folio_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "billing", "{{folio_id}}"] }
+          }
+        },
+        {
+          "name": "Get Folio Statement",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/billing/{{folio_id}}/statement", "host": ["{{base_url}}"], "path": ["api", "v1", "billing", "{{folio_id}}", "statement"] }
+          }
+        },
+        {
+          "name": "Get Folio by Reservation",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) pm.collectionVariables.set('folio_id', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/v1/billing/by-reservation/{{reservation_id}}", "host": ["{{base_url}}"], "path": ["api", "v1", "billing", "by-reservation", "{{reservation_id}}"] }
+          }
+        },
+        {
+          "name": "Add Line Item",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.id) pm.collectionVariables.set('line_item_id', json.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"item_type\": \"food_beverage\",\n  \"description\": \"Room service — breakfast\",\n  \"quantity\": \"1.00\",\n  \"unit_price\": \"25.00\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/billing/{{folio_id}}/line-items", "host": ["{{base_url}}"], "path": ["api", "v1", "billing", "{{folio_id}}", "line-items"] }
+          }
+        },
+        {
+          "name": "Void Line Item",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/billing/{{folio_id}}/line-items/{{line_item_id}}/void", "host": ["{{base_url}}"], "path": ["api", "v1", "billing", "{{folio_id}}", "line-items", "{{line_item_id}}", "void"] }
+          }
+        },
+        {
+          "name": "Post Payment",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"method\": \"credit_card\",\n  \"amount\": \"820.00\",\n  \"reference_no\": \"TXN-001\",\n  \"notes\": null\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/api/v1/billing/{{folio_id}}/payments", "host": ["{{base_url}}"], "path": ["api", "v1", "billing", "{{folio_id}}", "payments"] }
+          }
+        },
+        {
+          "name": "Close Folio",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/v1/billing/{{folio_id}}/close", "host": ["{{base_url}}"], "path": ["api", "v1", "billing", "{{folio_id}}", "close"] }
+          }
+        }
+      ]
+    }
+  ]
+}
