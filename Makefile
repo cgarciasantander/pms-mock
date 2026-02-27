@@ -1,4 +1,4 @@
-.PHONY: run dev up down migrate downgrade revision seed test lint format install
+.PHONY: run dev up down docker migrate downgrade revision seed test lint format install
 
 install:
 	pip install -e ".[dev]"
@@ -12,10 +12,13 @@ dev:
 
 # ── Docker ────────────────────────────────────────────────────────────────────
 up:
-	docker-compose up -d
+	docker compose up -d
 
 down:
-	docker-compose down
+	docker compose down
+
+docker:
+	docker compose --profile api up --build -d
 
 # ── Database migrations ───────────────────────────────────────────────────────
 migrate:
